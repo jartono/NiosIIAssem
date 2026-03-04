@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>NIOS II Instruction Visualizer</title>
+  <style>
+    /* --- Layout & typography --- */
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 960px;
+      background: #020617;
+      border-radius: 16px;
+      padding: 24px 28px 32px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.8);
+      border: 1px solid #1f2937;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 24px;
+      letter-spacing: 0.03em;
+    }
+
+    .subtitle {
+      margin: 0 0 20px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    /* --- Instruction type selector --- */
+    .control-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: radial-gradient(circle at top left, #1d4ed8 0, #020617 55%);
+      border: 1px solid #1d4ed8;
+    }
+
+    .control-label {
+      font-size: 13px;
+      color: #d1d5db;
+      font-weight: 500;
+    }
+
+    select {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 13px;
+      outline: none;
+    }
+
+    select:focus {
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+    }
+
+    /* --- Bit grid --- */
+    .bit-container {
+      margin-top: 8px;
+    }
+
+    .bit-grid-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .bit-grid-header span {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .bit-grid {
+      display: grid;
+      grid-template-columns: repeat(32, minmax(14px, 1fr));
+      gap: 3px;
+      padding: 10px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #020617, #020617 40%, #0b1120);
+      border: 1px solid #111827;
+    }
+
+    .bit-label-row {
+      display: grid;
+      grid-template-columns: repeat(32, minmax(14px, 1fr));
+      gap: 3px;
+      margin-top: 4px;
+      padding: 0 10px;
+      font-size: 9px;
+      color: #64748b;
+    }
+
+    .bit-label-row span {
+      text-align: center;
+    }
+
+    .bit-input {
+      width: 100%;
+      text-align: center;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      padding: 2px 0;
+      font-size: 11px;
+      background: rgba(15, 23, 42, 0.9);
+      color: #e5e7eb;
+      outline: none;
+    }
+
+    .bit-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45);
+      background: #020617;
+    }
+
+    .bit-input::placeholder {
+      color: #4b5563;
+    }
+
+    /* --- Field colors (opcode, registers, etc.) --- */
+    .field-opcode {
+      background: rgba(59, 130, 246, 0.25);
+      border-color: rgba(59, 130, 246, 0.75);
+    }
+
+    /* OPX: opcode extension, slightly different blue shade */
+    .field-opx {
+      background: rgba(37, 99, 235, 0.28);
+      border-color: rgba(37, 99, 235, 0.9);
+    }
+
+    .field-reg {
+      background: rgba(16, 185, 129, 0.22);
+      border-color: rgba(16, 185, 129, 0.8);
+    }
+
+    /* Slightly different shades for A, B, C registers */
+    .field-reg-a {
+      background: rgba(34, 197, 94, 0.24);
+      border-color: rgba(34, 197, 94, 0.9);
+    }
+
+    .field-reg-b {
+      background: rgba(16, 185, 129, 0.24);
+      border-color: rgba(16, 185, 129, 0.9);
+    }
+
+    .field-reg-c {
+      background: rgba(45, 212, 191, 0.24);
+      border-color: rgba(45, 212, 191, 0.9);
+    }
+
+    .field-func {
+      background: rgba(236, 72, 153, 0.25);
+      border-color: rgba(236, 72, 153, 0.9);
+    }
+
+    .field-imm {
+      background: rgba(250, 204, 21, 0.18);
+      border-color: rgba(250, 204, 21, 0.85);
+    }
+
+    .field-unused {
+      background: rgba(75, 85, 99, 0.35);
+      border-color: rgba(75, 85, 99, 0.9);
+    }
+
+    /* --- Legend --- */
+    .legend {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid #1f2937;
+    }
+
+    .legend-opcode {
+      background: rgba(59, 130, 246, 0.6);
+      border-color: rgba(59, 130, 246, 1);
+    }
+
+    .legend-opx {
+      background: rgba(37, 99, 235, 0.75);
+      border-color: rgba(37, 99, 235, 1);
+    }
+
+    .legend-reg {
+      background: rgba(16, 185, 129, 0.6);
+      border-color: rgba(16, 185, 129, 1);
+    }
+
+    .legend-func {
+      background: rgba(236, 72, 153, 0.6);
+      border-color: rgba(236, 72, 153, 1);
+    }
+
+    .legend-imm {
+      background: rgba(250, 204, 21, 0.7);
+      border-color: rgba(250, 204, 21, 1);
+    }
+
+    .legend-unused {
+      background: rgba(75, 85, 99, 0.8);
+      border-color: rgba(75, 85, 99, 1);
+    }
+
+    /* --- Hex + decoded fields panel --- */
+    .hex-row {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .hex-input {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      width: 160px;
+    }
+
+    .hex-input:focus {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+    }
+
+    .decoded-table {
+      margin-top: 10px;
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+      color: #d1d5db;
+    }
+
+    .decoded-table th,
+    .decoded-table td {
+      padding: 4px 6px;
+      border-bottom: 1px solid #1f2937;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .decoded-table th {
+      font-weight: 500;
+      color: #9ca3af;
+    }
+
+    /* --- Helper row for labels like "opcode", "rs", etc. --- */
+    .field-name-row {
+      display: grid;
+      grid-template-columns: repeat(32, minmax(14px, 1fr));
+      gap: 3px;
+      padding: 0 10px 4px;
+      font-size: 10px;
+      color: #cbd5f5;
+    }
+
+    .field-name-row span {
+      text-align: center;
+      opacity: 0.85;
+    }
+
+    /* --- Utility --- */
+    .mt-16 {
+      margin-top: 16px;
+    }
+
+    .note {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 10px;
+    }
+
+    /* --- Assembly encode/decode --- */
+    .asm-section {
+      margin-top: 18px;
+      padding-top: 12px;
+      border-top: 1px solid #111827;
+    }
+
+    .asm-column-title {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+
+    .asm-textarea {
+      width: 100%;
+      min-height: 44px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      resize: vertical;
+    }
+
+    .asm-textarea[readonly] {
+      opacity: 0.9;
+    }
+
+    .asm-textarea:focus {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+    }
+
+    .asm-button {
+      margin-top: 6px;
+      padding: 5px 10px;
+      border-radius: 7px;
+      border: 1px solid #2563eb;
+      background: linear-gradient(135deg, #1d4ed8, #1e40af);
+      color: #e5e7eb;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .asm-button:hover {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    }
+
+    .asm-select {
+      margin-top: 6px;
+      padding: 5px 8px;
+      border-radius: 7px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 12px;
+      outline: none;
+    }
+
+    .asm-select:focus {
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+    }
+
+    .asm-hint {
+      margin-top: 4px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .asm-error {
+      margin-top: 4px;
+      font-size: 11px;
+      color: #f87171;
+    }
+
+    .asm-warning {
+      margin-top: 4px;
+      font-size: 11px;
+      color: #fbbf24;
+    }
+
+    .instr-ref-btn {
+      margin-left: 12px;
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #374151;
+      color: #f3f4f6;
+      border: 1px solid #4b5563;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .instr-ref-btn:hover {
+      background: #4b5563;
+    }
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal-content {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      max-width: 640px;
+      max-height: 85vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+    .modal-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #374151;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h2 { margin: 0; font-size: 18px; color: #f3f4f6; }
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+    }
+    .modal-close:hover { color: #f3f4f6; }
+    .modal-body {
+      padding: 16px 18px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+    .instr-ref-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .instr-ref-table th, .instr-ref-table td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #374151;
+    }
+    .instr-ref-table th {
+      color: #9ca3af;
+      font-weight: 600;
+    }
+    .instr-ref-table td:first-child {
+      font-family: var(--mono);
+      color: #93c5fd;
+    }
+    .instr-ref-table tr:hover td { background: #374151; }
+    .instr-ref-section {
+      margin-top: 14px;
+      color: #9ca3af;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    .instr-ref-section:first-child { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>NIOS II Instruction Visualizer</h1>
+
+    <!-- Instruction type selector -->
+    <div class="control-row">
+      <span class="control-label">Instruction type:</span>
+      <select id="instrType">
+        <option value="R">R-type</option>
+        <option value="I">I-type</option>
+        <option value="J">J-type</option>
+      </select>
+      <span class="note">
+        Tip: click in the leftmost box and type 0s and 1s; focus moves automatically.
+      </span>
+      <button type="button" id="instrRefBtn" class="instr-ref-btn">Supported instructions</button>
+    </div>
+
+    <!-- 32-bit grid -->
+    <div class="bit-container">
+      <div class="bit-grid-header">
+        <span>Machine code (32 bits, bit 31 on the left)</span>
+      </div>
+      <div class="bit-grid" id="bitGrid">
+        <!-- JS will insert 32 bit inputs here -->
+      </div>
+    </div>
+
+    <!-- Bit index labels (31 ... 0) -->
+    <div class="bit-label-row" id="bitIndices"></div>
+
+    <!-- Field names row (opcode, rs, imm, etc.) -->
+    <div class="field-name-row" id="fieldNames"></div>
+
+    <!-- Hex input + decoded fields -->
+    <div class="hex-row">
+      <span>Hex (8 digits):</span>
+      <input id="hexInput" class="hex-input" maxlength="12" placeholder="00000000" />
+      <span>(kept in sync with the 32 bits)</span>
+    </div>
+
+    <table class="decoded-table" id="decodedTable">
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Bits</th>
+          <th>Unsigned</th>
+          <th>Hex</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- JS will populate rows -->
+      </tbody>
+    </table>
+
+    <!-- Assembly encode/decode -->
+    <div class="asm-section">
+      <div class="asm-column-title">Assembly (decoded from bits or typed and assembled into bits)</div>
+      <textarea id="asmBox" class="asm-textarea" placeholder="Example: addi r4, r5, 50"></textarea>
+      <div style="display:flex; gap:8px; margin-top:6px;">
+        <button id="decodeFromBitsBtn" class="asm-button">Decode from bits</button>
+        <select id="immFormat" class="asm-select" title="How immediates are shown when decoding">
+          <option value="dec" selected>imm: dec</option>
+          <option value="hex">imm: hex</option>
+          <option value="bin">imm: bin</option>
+          <option value="all">imm: all</option>
+        </select>
+        <button id="asmAssembleBtn" class="asm-button">Assemble to bits</button>
+      </div>
+      <div id="asmError" class="asm-error"></div>
+      <div id="asmWarning" class="asm-warning"></div>
+      <div class="asm-hint">
+        - Click &quot;Decode from bits&quot; to convert the current 32-bit machine code above into assembly.<br />
+        - Type an instruction here and click &quot;Assemble to bits&quot; to encode it into machine code.
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend mt-16">
+      <div class="legend-item">
+        <span class="legend-swatch legend-opcode"></span>
+        <span>Opcode</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch legend-opx"></span>
+        <span>OPX (opcode extension)</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch legend-reg"></span>
+        <span>Register index</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch legend-func"></span>
+        <span>Function / sub-opcode</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch legend-imm"></span>
+        <span>Immediate / address</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch legend-unused"></span>
+        <span>Unused / reserved</span>
+      </div>
+    </div>
+
+    <p class="note">
+      This is a visualization-only UI to help you see how a 32-bit NIOS II instruction is split into
+      fields. In a next step we can wire this up to actually decode and encode instructions from
+      assembly mnemonics and register names into machine code and back.
+    </p>
+
+    <!-- Supported instructions modal -->
+    <div id="instrRefModal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Supported instructions</h2>
+          <button type="button" id="instrRefClose" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="instrRefBody">
+          <div class="instr-ref-section">Pseudo-instructions</div>
+          <table class="instr-ref-table">
+            <thead><tr><th>Syntax</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>mov rD, rS</td><td>Copy register (add rD, rS, r0)</td></tr>
+              <tr><td>movi rD, imm</td><td>Load 16-bit signed immediate (addi rD, r0, imm)</td></tr>
+              <tr><td>movhi rD, imm</td><td>Load immediate into high 16 bits (orhi rD, r0, imm)</td></tr>
+              <tr><td>nop</td><td>No operation (add r0, r0, r0)</td></tr>
+              <tr><td>not rD, rS</td><td>Bitwise NOT (nor rD, rS, r0)</td></tr>
+              <tr><td>neg rD, rS</td><td>Negate (sub rD, r0, rS)</td></tr>
+              <tr><td>subi rD, rS, imm</td><td>Subtract immediate (addi rD, rS, -imm)</td></tr>
+            </tbody>
+          </table>
+          <div class="instr-ref-section">I-type — arithmetic / logic immediates</div>
+          <table class="instr-ref-table">
+            <thead><tr><th>Syntax</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>addi rB, rA, imm</td><td>Add immediate (signed 16-bit)</td></tr>
+              <tr><td>andi rB, rA, imm</td><td>AND immediate</td></tr>
+              <tr><td>ori rB, rA, imm</td><td>OR immediate</td></tr>
+              <tr><td>xori rB, rA, imm</td><td>XOR immediate</td></tr>
+              <tr><td>orhi rB, rA, imm</td><td>OR immediate into high 16 bits</td></tr>
+              <tr><td>xorhi rB, rA, imm</td><td>XOR immediate into high 16 bits</td></tr>
+            </tbody>
+          </table>
+          <div class="instr-ref-section">I-type — load/store</div>
+          <table class="instr-ref-table">
+            <thead><tr><th>Syntax</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>ldw rB, imm(rA)</td><td>Load word (32-bit)</td></tr>
+              <tr><td>ldwio rB, imm(rA)</td><td>Load word I/O</td></tr>
+              <tr><td>stw rB, imm(rA)</td><td>Store word</td></tr>
+              <tr><td>sth rB, imm(rA)</td><td>Store halfword</td></tr>
+              <tr><td>stb rB, imm(rA)</td><td>Store byte</td></tr>
+              <tr><td>ldh rB, imm(rA)</td><td>Load halfword (sign-extended)</td></tr>
+              <tr><td>ldhu rB, imm(rA)</td><td>Load halfword unsigned</td></tr>
+              <tr><td>ldb rB, imm(rA)</td><td>Load byte (sign-extended)</td></tr>
+              <tr><td>ldbu rB, imm(rA)</td><td>Load byte unsigned</td></tr>
+            </tbody>
+          </table>
+          <div class="instr-ref-section">I-type — branches</div>
+          <table class="instr-ref-table">
+            <thead><tr><th>Syntax</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>br offset</td><td>Branch (PC-relative)</td></tr>
+              <tr><td>blt rA, rB, offset</td><td>Branch if less than (signed)</td></tr>
+              <tr><td>bge rA, rB, offset</td><td>Branch if greater or equal (signed)</td></tr>
+              <tr><td>bltu rA, rB, offset</td><td>Branch if less than (unsigned)</td></tr>
+              <tr><td>bgeu rA, rB, offset</td><td>Branch if greater or equal (unsigned)</td></tr>
+              <tr><td>beq rA, rB, offset</td><td>Branch if equal</td></tr>
+              <tr><td>bne rA, rB, offset</td><td>Branch if not equal</td></tr>
+            </tbody>
+          </table>
+          <div class="instr-ref-section">R-type — arithmetic / logic</div>
+          <table class="instr-ref-table">
+            <thead><tr><th>Syntax</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>add rC, rA, rB</td><td>Add</td></tr>
+              <tr><td>sub rC, rA, rB</td><td>Subtract</td></tr>
+              <tr><td>and rC, rA, rB</td><td>AND</td></tr>
+              <tr><td>or rC, rA, rB</td><td>OR</td></tr>
+              <tr><td>xor rC, rA, rB</td><td>XOR</td></tr>
+              <tr><td>nor rC, rA, rB</td><td>NOR</td></tr>
+              <tr><td>mul rC, rA, rB</td><td>Multiply (low 32 bits)</td></tr>
+              <tr><td>sll rC, rA, rB</td><td>Shift left logical</td></tr>
+              <tr><td>srl rC, rA, rB</td><td>Shift right logical</td></tr>
+              <tr><td>sra rC, rA, rB</td><td>Shift right arithmetic</td></tr>
+            </tbody>
+          </table>
+          <div class="instr-ref-section">J-type</div>
+          <table class="instr-ref-table">
+            <thead><tr><th>Syntax</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>call target</td><td>Call (26-bit target)</td></tr>
+              <tr><td>jmpi target</td><td>Jump (26-bit target)</td></tr>
+            </tbody>
+          </table>
+          <p class="note" style="margin-top:12px; font-size:12px;">Immediates can be decimal, hex (0x…), or binary (0b…).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Configuration: field layouts for R/I/J types ---
+    // We’ll assume a common 32-bit RISC shape:
+    //  - bits are numbered [31..0] from left to right
+    //  - opcode is [31..26] (6 bits)
+    //
+    // For now, these are "generic" layouts and you can later
+    // adjust them exactly to match your NIOS II reference sheet.
+    //
+    // Each entry: { start, end, className, label }
+    // where start/end are inclusive bit positions, start >= end.
+    const layouts = {
+      // Nios II R-type: A[31:27], B[26:22], C[21:17], OPX[16:6], OP[5:0]
+      R: [
+        { start: 31, end: 27, className: "field-reg-a", label: "A" },
+        { start: 26, end: 22, className: "field-reg-b", label: "B" },
+        { start: 21, end: 17, className: "field-reg-c", label: "C" },
+        { start: 16, end: 6, className: "field-opx", label: "OPX" },
+        { start: 5, end: 0, className: "field-opcode", label: "OP" },
+      ],
+      // Nios II I-type: A[31:27], B[26:22], IMM16[21:6], OP[5:0]
+      I: [
+        { start: 31, end: 27, className: "field-reg-a", label: "A" },
+        { start: 26, end: 22, className: "field-reg-b", label: "B" },
+        { start: 21, end: 6, className: "field-imm", label: "IMM16" },
+        { start: 5, end: 0, className: "field-opcode", label: "OP" },
+      ],
+      // Nios II J-type: IMM26[31:6], OP[5:0]
+      J: [
+        { start: 31, end: 6, className: "field-imm", label: "IMM26" },
+        { start: 5, end: 0, className: "field-opcode", label: "OP" },
+      ],
+    };
+
+    // --- Nios II opcode table (decode: bits -> asm) ---
+    // I-type: op only. J-type: op only. R-type: op 0x3A + opx. R format: "3reg"|"no"|"rA"|"rC"|"imm5"|"rCrAimm5"|"rdctl"|"wrctl"|"wrprs"
+    const OPCODES = {
+      I: {
+        0x04: { mnemonic: "addi", signedImm: true, fmt: "rB,rA,imm" },
+        0x0C: { mnemonic: "andi", signedImm: false, fmt: "rB,rA,imm" },
+        0x14: { mnemonic: "ori", signedImm: false, fmt: "rB,rA,imm" },
+        0x1C: { mnemonic: "xori", signedImm: false, fmt: "rB,rA,imm" },
+        0x17: { mnemonic: "ldw", signedImm: true, fmt: "ldst" },
+        0x15: { mnemonic: "stw", signedImm: true, fmt: "ldst" },
+        0x26: { mnemonic: "beq", signedImm: true, fmt: "branch" },
+        0x1E: { mnemonic: "bne", signedImm: true, fmt: "branch" },
+        0x2C: { mnemonic: "andhi", signedImm: false, fmt: "rB,rA,imm" },
+        0x0E: { mnemonic: "bge", signedImm: true, fmt: "branch" },
+        0x2E: { mnemonic: "bgeu", signedImm: true, fmt: "branch" },
+        0x16: { mnemonic: "blt", signedImm: true, fmt: "branch" },
+        0x36: { mnemonic: "bltu", signedImm: true, fmt: "branch" },
+        0x06: { mnemonic: "br", signedImm: true, fmt: "br" },
+        0x20: { mnemonic: "cmpeqi", signedImm: true, fmt: "rB,rA,imm" },
+        0x08: { mnemonic: "cmpgei", signedImm: true, fmt: "rB,rA,imm" },
+        0x28: { mnemonic: "cmpgeui", signedImm: false, fmt: "rB,rA,imm" },
+        0x10: { mnemonic: "cmplti", signedImm: true, fmt: "rB,rA,imm" },
+        0x30: { mnemonic: "cmpltui", signedImm: false, fmt: "rB,rA,imm" },
+        0x18: { mnemonic: "cmpnei", signedImm: true, fmt: "rB,rA,imm" },
+        0x3B: { mnemonic: "flushd", signedImm: true, fmt: "base_imm" },
+        0x1B: { mnemonic: "flushda", signedImm: true, fmt: "base_imm" },
+        0x33: { mnemonic: "initd", signedImm: true, fmt: "base_imm" },
+        0x13: { mnemonic: "initda", signedImm: true, fmt: "base_imm" },
+        0x07: { mnemonic: "ldb", signedImm: true, fmt: "ldst" },
+        0x27: { mnemonic: "ldbio", signedImm: true, fmt: "ldst" },
+        0x03: { mnemonic: "ldbu", signedImm: true, fmt: "ldst" },
+        0x23: { mnemonic: "ldbuio", signedImm: true, fmt: "ldst" },
+        0x0F: { mnemonic: "ldh", signedImm: true, fmt: "ldst" },
+        0x2F: { mnemonic: "ldhio", signedImm: true, fmt: "ldst" },
+        0x0B: { mnemonic: "ldhu", signedImm: true, fmt: "ldst" },
+        0x2B: { mnemonic: "ldhuio", signedImm: true, fmt: "ldst" },
+        0x37: { mnemonic: "ldwio", signedImm: true, fmt: "ldst" },
+        0x24: { mnemonic: "muli", signedImm: true, fmt: "rB,rA,imm" },
+        0x34: { mnemonic: "orhi", signedImm: true, fmt: "rB,rA,imm" },
+        0x38: { mnemonic: "rdprs", signedImm: true, fmt: "rB,rA,imm" },
+        0x05: { mnemonic: "stb", signedImm: true, fmt: "ldst" },
+        0x25: { mnemonic: "stbio", signedImm: true, fmt: "ldst" },
+        0x0D: { mnemonic: "sth", signedImm: true, fmt: "ldst" },
+        0x2D: { mnemonic: "sthio", signedImm: true, fmt: "ldst" },
+        0x35: { mnemonic: "stwio", signedImm: true, fmt: "ldst" },
+        0x3C: { mnemonic: "xorhi", signedImm: false, fmt: "rB,rA,imm" },
+        0x32: { mnemonic: "custom", signedImm: false, fmt: "custom" },
+      },
+      J: {
+        0x00: { mnemonic: "call" },
+        0x01: { mnemonic: "jmpi" },
+      },
+      R: {
+        0x31: { mnemonic: "add", format: "3reg" },
+        0x39: { mnemonic: "sub", format: "3reg" },
+        0x0E: { mnemonic: "and", format: "3reg" },
+        0x16: { mnemonic: "or", format: "3reg" },
+        0x1E: { mnemonic: "xor", format: "3reg" },
+        0x0D: { mnemonic: "jmp", format: "rA" },
+        0x1D: { mnemonic: "callr", format: "rA" },
+        0x05: { mnemonic: "ret", format: "no" },
+        0x34: { mnemonic: "break", format: "imm5" },
+        0x09: { mnemonic: "bret", format: "no" },
+        0x20: { mnemonic: "cmpeq", format: "3reg" },
+        0x08: { mnemonic: "cmpge", format: "3reg" },
+        0x28: { mnemonic: "cmpgeu", format: "3reg" },
+        0x10: { mnemonic: "cmplt", format: "3reg" },
+        0x30: { mnemonic: "cmpltu", format: "3reg" },
+        0x18: { mnemonic: "cmpne", format: "3reg" },
+        0x25: { mnemonic: "div", format: "3reg" },
+        0x24: { mnemonic: "divu", format: "3reg" },
+        0x01: { mnemonic: "eret", format: "no" },
+        0x0C: { mnemonic: "flushi", format: "rA" },
+        0x04: { mnemonic: "flushp", format: "no" },
+        0x29: { mnemonic: "initi", format: "rA" },
+        0x27: { mnemonic: "mul", format: "3reg" },
+        0x1F: { mnemonic: "mulxss", format: "3reg" },
+        0x17: { mnemonic: "mulxsu", format: "3reg" },
+        0x07: { mnemonic: "mulxuu", format: "3reg" },
+        0x1C: { mnemonic: "nextpc", format: "rC" },
+        0x06: { mnemonic: "nor", format: "3reg" },
+        0x26: { mnemonic: "rdctl", format: "rdctl" },
+        0x03: { mnemonic: "rol", format: "3reg" },
+        0x02: { mnemonic: "roli", format: "rCrAimm5" },
+        0x0B: { mnemonic: "ror", format: "3reg" },
+        0x13: { mnemonic: "sll", format: "3reg" },
+        0x12: { mnemonic: "slli", format: "rCrAimm5" },
+        0x3B: { mnemonic: "sra", format: "3reg" },
+        0x3A: { mnemonic: "srai", format: "rCrAimm5" },
+        0x1B: { mnemonic: "srl", format: "3reg" },
+        0x1A: { mnemonic: "srli", format: "rCrAimm5" },
+        0x36: { mnemonic: "sync", format: "no" },
+        0x2D: { mnemonic: "trap", format: "imm5" },
+        0x2E: { mnemonic: "wrctl", format: "wrctl" },
+        0x14: { mnemonic: "wrprs", format: "wrprs" },
+      },
+      // R-type with imm5/ctl in low 5 bits of OPX: key = opx >> 5
+      R_OPX_HI: {
+        0x02: { mnemonic: "roli", format: "rCrAimm5" },
+        0x12: { mnemonic: "slli", format: "rCrAimm5" },
+        0x1A: { mnemonic: "srli", format: "rCrAimm5" },
+        0x3A: { mnemonic: "srai", format: "rCrAimm5" },
+        0x34: { mnemonic: "break", format: "imm5" },
+        0x2D: { mnemonic: "trap", format: "imm5" },
+        0x26: { mnemonic: "rdctl", format: "rdctl" },
+        0x2E: { mnemonic: "wrctl", format: "wrctl" },
+      },
+    };
+    const R_TYPE_OP = 0x3A;
+
+    // --- DOM refs ---
+    const bitGrid = document.getElementById("bitGrid");
+    const bitIndices = document.getElementById("bitIndices");
+    const fieldNamesRow = document.getElementById("fieldNames");
+    const instrTypeSelect = document.getElementById("instrType");
+    const hexInput = document.getElementById("hexInput");
+    const decodedTable = document.getElementById("decodedTable").querySelector("tbody");
+    const asmBox = document.getElementById("asmBox");
+    const asmError = document.getElementById("asmError");
+    const asmWarning = document.getElementById("asmWarning");
+    const decodeFromBitsBtn = document.getElementById("decodeFromBitsBtn");
+    const immFormatSelect = document.getElementById("immFormat");
+    const asmAssembleBtn = document.getElementById("asmAssembleBtn");
+    const instrRefBtn = document.getElementById("instrRefBtn");
+    const instrRefModal = document.getElementById("instrRefModal");
+    const instrRefClose = document.getElementById("instrRefClose");
+
+    // Store bit inputs for quick access
+    const bitInputs = [];
+
+    function createBitGrid() {
+      // Create bit index labels (31..0)
+      for (let bit = 31; bit >= 0; bit--) {
+        const span = document.createElement("span");
+        span.textContent = bit;
+        bitIndices.appendChild(span);
+      }
+
+      function fillBits(startIndex, bitString) {
+        const maxLen = Math.min(32 - startIndex, bitString.length);
+        for (let j = 0; j < maxLen; j++) {
+          bitInputs[startIndex + j].value = bitString[j];
+        }
+        hexInput.value = bitsToHexString();
+        updateDecodedTable();
+
+        const nextIndex = Math.min(31, startIndex + maxLen);
+        if (bitInputs[nextIndex]) {
+          bitInputs[nextIndex].focus();
+          bitInputs[nextIndex].select();
+        }
+      }
+
+      // Create 32 inputs, bit 31 at left -> index 0 in the grid
+      for (let i = 0; i < 32; i++) {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 1;
+        input.placeholder = "0";
+        input.className = "bit-input";
+        input.dataset.bit = 31 - i; // store actual bit number
+
+        // Only allow '0' or '1'; auto-move focus
+        input.addEventListener("input", (e) => {
+          const v = e.target.value.trim();
+          if (v === "") return;
+          if (v !== "0" && v !== "1") {
+            e.target.value = "";
+            return;
+          }
+          const idx = bitInputs.indexOf(e.target);
+          if (idx >= 0 && idx < bitInputs.length - 1) {
+            bitInputs[idx + 1].focus();
+            bitInputs[idx + 1].select();
+          }
+        });
+
+        // Allow pasting a binary string (e.g. 16 or 32 bits)
+        input.addEventListener("paste", (e) => {
+          const text = (e.clipboardData || window.clipboardData)?.getData("text") ?? "";
+          const bits = text.replace(/[^01]/g, "");
+          if (!bits) return;
+          e.preventDefault();
+
+          const idx = bitInputs.indexOf(e.target);
+          if (idx === -1) return;
+
+          // If the user pastes 32+ bits, treat it as a full word paste.
+          if (bits.length >= 32) {
+            fillBits(0, bits.slice(0, 32));
+          } else {
+            fillBits(idx, bits);
+          }
+        });
+
+        // Arrow key navigation and backspace behaviour
+        input.addEventListener("keydown", (e) => {
+          const idx = bitInputs.indexOf(e.target);
+          if (idx === -1) return;
+          if (e.key === "ArrowRight") {
+            if (idx < bitInputs.length - 1) {
+              e.preventDefault();
+              bitInputs[idx + 1].focus();
+              bitInputs[idx + 1].select();
+            }
+          } else if (e.key === "ArrowLeft") {
+            if (idx > 0) {
+              e.preventDefault();
+              bitInputs[idx - 1].focus();
+              bitInputs[idx - 1].select();
+            }
+          } else if (e.key === "Backspace") {
+            // If this field is empty, move left and clear previous
+            if (e.target.value === "" && idx > 0) {
+              e.preventDefault();
+              const prev = bitInputs[idx - 1];
+              prev.value = "";
+              prev.focus();
+              prev.select();
+            }
+          }
+        });
+
+        bitGrid.appendChild(input);
+        bitInputs.push(input);
+      }
+    }
+
+    function clearFieldNameRow() {
+      fieldNamesRow.innerHTML = "";
+      for (let i = 0; i < 32; i++) {
+        const span = document.createElement("span");
+        span.textContent = "";
+        fieldNamesRow.appendChild(span);
+      }
+    }
+
+    function applyLayout(instrType) {
+      // Remove any previous field coloring classes
+      bitInputs.forEach((input) => {
+        input.classList.remove(
+          "field-opcode",
+          "field-reg",
+          "field-reg-a",
+          "field-reg-b",
+          "field-reg-c",
+          "field-opx",
+          "field-func",
+          "field-imm",
+          "field-unused"
+        );
+      });
+
+      clearFieldNameRow();
+
+      const spans = fieldNamesRow.querySelectorAll("span");
+      const layout = layouts[instrType];
+
+      layout.forEach((field) => {
+        const { start, end, className, label } = field;
+
+        // For each bit in [start..end], find the corresponding input
+        for (let bit = start; bit >= end; bit--) {
+          // bit 31 is at index 0; 31 - bit gives input index
+          const inputIndex = 31 - bit;
+          const input = bitInputs[inputIndex];
+          input.classList.add(className);
+
+          // Write the label in the middle of the field
+          const isMidBit = bit === Math.floor((start + end) / 2);
+          if (isMidBit) {
+            spans[inputIndex].textContent = label;
+          }
+        }
+      });
+    }
+
+    function bitsToHexString() {
+      let bits = "";
+      bitInputs.forEach((input) => {
+        const v = input.value === "1" ? "1" : "0";
+        bits += v;
+      });
+      const value = parseInt(bits, 2) >>> 0;
+      return value.toString(16).toUpperCase().padStart(8, "0");
+    }
+
+    function hexStringToBits(hex) {
+      const clean = (hex || "").toString().trim().toUpperCase().replace(/[^0-9A-F]/g, "");
+      if (clean.length === 0) return;
+      const padded = clean.padStart(8, "0").slice(-8);
+      const value = parseInt(padded, 16) >>> 0;
+      const bits = value.toString(2).padStart(32, "0");
+      // Fill bit inputs (bit 31 at index 0)
+      for (let i = 0; i < 32; i++) {
+        bitInputs[i].value = bits[i];
+      }
+    }
+
+    function readBits(start, end) {
+      let bits = "";
+      for (let bit = start; bit >= end; bit--) {
+        const idx = 31 - bit;
+        const v = bitInputs[idx].value === "1" ? "1" : "0";
+        bits += v;
+      }
+      const unsigned = parseInt(bits || "0", 2) >>> 0;
+      return {
+        bits,
+        unsigned,
+        hex: "0x" + unsigned.toString(16).toUpperCase(),
+      };
+    }
+
+    function updateDecodedTable() {
+      const type = instrTypeSelect.value;
+      const rows = [];
+      if (type === "R") {
+        rows.push({ name: "A", range: "[31:27]", ...readBits(31, 27) });
+        rows.push({ name: "B", range: "[26:22]", ...readBits(26, 22) });
+        rows.push({ name: "C", range: "[21:17]", ...readBits(21, 17) });
+        rows.push({ name: "OPX", range: "[16:6]", ...readBits(16, 6) });
+        rows.push({ name: "OP", range: "[5:0]", ...readBits(5, 0) });
+      } else if (type === "I") {
+        rows.push({ name: "A", range: "[31:27]", ...readBits(31, 27) });
+        rows.push({ name: "B", range: "[26:22]", ...readBits(26, 22) });
+        rows.push({ name: "IMM16", range: "[21:6]", ...readBits(21, 6) });
+        rows.push({ name: "OP", range: "[5:0]", ...readBits(5, 0) });
+      } else if (type === "J") {
+        rows.push({ name: "IMM26", range: "[31:6]", ...readBits(31, 6) });
+        rows.push({ name: "OP", range: "[5:0]", ...readBits(5, 0) });
+      }
+
+      decodedTable.innerHTML = "";
+      rows.forEach((r) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${r.name}</td>
+          <td>${r.range}</td>
+          <td>${r.unsigned}</td>
+          <td>${r.hex}</td>
+        `;
+        decodedTable.appendChild(tr);
+      });
+    }
+
+    // --- Assembly decoding (bits -> asm) ---
+    function signExtend16(u16) {
+      return (u16 & 0x8000) ? (u16 - 0x10000) : u16;
+    }
+
+    function formatSignedImm(value) {
+      const mode = immFormatSelect.value;
+      const v = value | 0;
+      const hex = "0x" + ((v < 0 ? (v + 0x10000) : v) & 0xFFFF).toString(16).toUpperCase();
+      const bin = "0b" + ((v < 0 ? (v + 0x10000) : v) & 0xFFFF).toString(2).padStart(16, "0");
+      if (mode === "hex") return hex;
+      if (mode === "bin") return bin;
+      if (mode === "all") return `${v} (${hex}, ${bin})`;
+      return String(v);
+    }
+
+    function formatUnsigned(value, bits = null) {
+      const mode = immFormatSelect.value;
+      const u = value >>> 0;
+      const mask = bits ? (bits >= 32 ? 0xFFFFFFFF : ((1 << bits) - 1)) : 0xFFFFFFFF;
+      const uMasked = (u & mask) >>> 0;
+      const hex = "0x" + uMasked.toString(16).toUpperCase();
+      const bin = "0b" + uMasked.toString(2).padStart(bits ?? 1, "0");
+      if (mode === "hex") return hex;
+      if (mode === "bin") return bin;
+      if (mode === "all") return `${uMasked} (${hex}, ${bin})`;
+      return String(uMasked);
+    }
+
+    function getWordFromBits() {
+      let bits = "";
+      for (let i = 0; i < 32; i++) bits += bitInputs[i].value === "1" ? "1" : "0";
+      return parseInt(bits, 2) >>> 0;
+    }
+
+    // Nios II special-purpose registers (GPR numbers and short names for warnings)
+    const REG_SPECIAL = {
+      0: "zero", 1: "at", 26: "gp", 27: "sp", 28: "fp", 29: "ea", 30: "ba", 31: "ra",
+    };
+
+    function getWarningsForWord(word) {
+      const warnings = [];
+      const op = word & 0x3F;
+      let destReg = null;
+
+      if (op === R_TYPE_OP) {
+        const opx = (word >>> 6) & 0x7FF;
+        const A = (word >>> 27) & 0x1F;
+        const B = (word >>> 22) & 0x1F;
+        const C = (word >>> 17) & 0x1F;
+        const info = OPCODES.R[opx] || OPCODES.R_OPX_HI[opx >> 5];
+        if (info) {
+          const f = info.format || info.syntax;
+          if (f === "3reg" || f === "rC" || f === "rCrAimm5" || f === "rdctl" || f === "wrprs") destReg = C;
+        }
+      } else if (OPCODES.I[op]) {
+        const info = OPCODES.I[op];
+        const B = (word >>> 22) & 0x1F;
+        const fmt = info.fmt || "";
+        if (fmt === "ldst" || fmt === "rB,rA,imm" || fmt === "custom") destReg = B;
+      }
+
+      if (destReg !== null && REG_SPECIAL[destReg] !== undefined) {
+        const name = REG_SPECIAL[destReg];
+        if (destReg === 0) warnings.push("Writing to r0 (zero) has no effect.");
+        else if (destReg === 26) warnings.push("Writing to r26 (gp) may break global data access.");
+        else if (destReg === 27) warnings.push("Writing to r27 (sp) may corrupt the stack.");
+        else if (destReg === 28) warnings.push("Writing to r28 (fp) may break the frame.");
+        else if (destReg === 29) warnings.push("Writing to r29 (ea) overwrites exception return address.");
+        else if (destReg === 30) warnings.push("Writing to r30 (ba) overwrites break return address.");
+        else if (destReg === 31) warnings.push("Writing to r31 (ra) overwrites the return address.");
+      }
+      return warnings;
+    }
+
+    function showWarnings(word) {
+      const list = getWarningsForWord(word);
+      asmWarning.textContent = list.length ? "⚠ " + list.join(" ") : "";
+    }
+
+    function decodeFromBits() {
+      asmError.textContent = "";
+      asmWarning.textContent = "";
+      const word = getWordFromBits();
+      const op = word & 0x3F;
+
+      if (op === R_TYPE_OP) {
+        const opx = (word >>> 6) & 0x7FF;
+        let info = OPCODES.R[opx];
+        if (!info) info = OPCODES.R_OPX_HI[opx >> 5];
+        if (!info) {
+          asmError.textContent = "Unknown R-type OPX: 0x" + opx.toString(16);
+          return;
+        }
+        instrTypeSelect.value = "R";
+        applyLayout("R");
+        const A = (word >>> 27) & 0x1F;
+        const B = (word >>> 22) & 0x1F;
+        const C = (word >>> 17) & 0x1F;
+        const imm5 = opx & 0x1F;
+        const f = info.format || info.syntax;
+        if (f === "no") asmBox.value = info.mnemonic;
+        else if (f === "rA") asmBox.value = info.mnemonic + " r" + A;
+        else if (f === "rC") asmBox.value = info.mnemonic + " r" + C;
+        else if (f === "imm5") asmBox.value = info.mnemonic + " " + formatUnsigned(imm5, 5);
+        else if (f === "rCrAimm5") asmBox.value = info.mnemonic + " r" + C + ", r" + A + ", " + imm5;
+        else if (f === "rdctl") asmBox.value = "rdctl r" + C + ", " + formatUnsigned(imm5, 5);
+        else if (f === "wrctl") asmBox.value = "wrctl " + formatUnsigned(imm5, 5) + ", r" + A;
+        else if (f === "wrprs") asmBox.value = "wrprs r" + C + ", r" + A;
+        else asmBox.value = info.mnemonic + " r" + C + ", r" + A + ", r" + B;
+        updateDecodedTable();
+        showWarnings(word);
+        return;
+      }
+
+      if (OPCODES.J[op]) {
+        const info = OPCODES.J[op];
+        instrTypeSelect.value = "J";
+        applyLayout("J");
+        const imm26 = (word >>> 6) & 0x3FFFFFF;
+        if (info.mnemonic === "call") asmBox.value = "call " + formatUnsigned(imm26, 26);
+        else asmBox.value = "jmpi " + formatUnsigned(imm26, 26);
+        updateDecodedTable();
+        showWarnings(word);
+        return;
+      }
+
+      const info = OPCODES.I[op];
+      if (!info) {
+        asmError.textContent = "Unknown opcode: 0x" + op.toString(16);
+        return;
+      }
+      instrTypeSelect.value = "I";
+      applyLayout("I");
+      const A = (word >>> 27) & 0x1F;
+      const B = (word >>> 22) & 0x1F;
+      const imm16u = (word >>> 6) & 0xFFFF;
+      const imm = info.signedImm ? signExtend16(imm16u) : imm16u;
+      const fmt = info.fmt || "rB,rA,imm";
+      const immText = info.signedImm ? formatSignedImm(imm) : formatUnsigned(imm, 16);
+      if (fmt === "ldst") asmBox.value = info.mnemonic + " r" + B + ", " + immText + "(r" + A + ")";
+      else if (fmt === "branch") asmBox.value = info.mnemonic + " r" + A + ", r" + B + ", " + immText;
+      else if (fmt === "br") asmBox.value = "br " + immText;
+      else if (fmt === "base_imm") asmBox.value = info.mnemonic + " " + immText + "(r" + A + ")";
+      else if (fmt === "custom") asmBox.value = "custom " + formatUnsigned(imm16u, 16) + ", r" + A + ", r" + B;
+      else if (info.mnemonic === "orhi" && A === 0) asmBox.value = "movhi r" + B + ", " + immText;
+      else asmBox.value = info.mnemonic + " r" + B + ", r" + A + ", " + immText;
+      updateDecodedTable();
+      showWarnings(word);
+    }
+
+    // --- Assembly encoding (asm -> bits) ---
+    function parseNumberLiteral(s) {
+      const str = (s || "").trim().toLowerCase().replace(/_/g, "");
+      if (!str) throw new Error("Missing number.");
+      let sign = 1;
+      let body = str;
+      if (body.startsWith("-")) { sign = -1; body = body.slice(1); }
+      if (body.startsWith("+")) { body = body.slice(1); }
+      if (body.startsWith("0x")) return sign * parseInt(body.slice(2) || "0", 16);
+      if (body.startsWith("0b")) return sign * parseInt(body.slice(2) || "0", 2);
+      if (!/^\d+$/.test(body)) throw new Error("Invalid number: " + s);
+      return sign * parseInt(body, 10);
+    }
+
+    function clampReg(r) {
+      const n = parseInt(r, 10) | 0;
+      if (n < 0 || n > 31) throw new Error("Register must be r0–r31.");
+      return n;
+    }
+    function imm16Signed(imm) {
+      const n = imm | 0;
+      if (n < -32768 || n > 32767) throw new Error("Immediate out of 16-bit signed range.");
+      return (n < 0 ? n + 0x10000 : n) & 0xFFFF;
+    }
+    function imm16Unsigned(imm) {
+      const n = imm | 0;
+      if (n < 0 || n > 65535) throw new Error("Immediate out of 16-bit unsigned range.");
+      return n & 0xFFFF;
+    }
+    function imm26Unsigned(imm) {
+      const n = imm | 0;
+      if (n < 0 || n > 0x3FFFFFF) throw new Error("Target out of 26-bit range.");
+      return n & 0x3FFFFFF;
+    }
+    function imm5Unsigned(imm) {
+      const n = imm | 0;
+      if (n < 0 || n > 31) throw new Error("Immediate must be 0–31.");
+      return n & 0x1F;
+    }
+
+    function encodeI(op, A, B, imm16) {
+      return ((A & 0x1F) << 27) | ((B & 0x1F) << 22) | ((imm16 & 0xFFFF) << 6) | (op & 0x3F);
+    }
+    function encodeJ(op, imm26) {
+      return ((imm26 & 0x3FFFFFF) << 6) | (op & 0x3F);
+    }
+    function encodeR(opx, A, B, C) {
+      return ((A & 0x1F) << 27) | ((B & 0x1F) << 22) | ((C & 0x1F) << 17) | ((opx & 0x7FF) << 6) | R_TYPE_OP;
+    }
+
+    function writeWord(word) {
+      const bits = (word >>> 0).toString(2).padStart(32, "0");
+      for (let i = 0; i < 32; i++) bitInputs[i].value = bits[i];
+      hexInput.value = bitsToHexString();
+      updateDecodedTable();
+    }
+
+    function handleAssembleClick() {
+      asmError.textContent = "";
+      const text = (asmBox.value || "").trim();
+      if (!text) {
+        asmError.textContent = "Please enter an instruction.";
+        return;
+      }
+      const t = text.replace(/\s+/g, " ").toLowerCase();
+      let word;
+      try {
+        // --- Pseudo-instructions (single-instruction expansions) ---
+        // mov rD, rS  => add rD, rS, r0
+        let m = /^mov\s+r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) {
+          word = encodeR(0x31, clampReg(m[2]), 0, clampReg(m[1]));
+          instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return;
+        }
+        // movi rD, imm => addi rD, r0, imm
+        m = /^movi\s+r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) {
+          word = encodeI(0x04, 0, clampReg(m[1]), imm16Signed(parseNumberLiteral(m[2])));
+          instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return;
+        }
+        // movhi rD, imm => orhi rD, r0, imm (load immediate into high 16 bits)
+        m = /^movhi\s+r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) {
+          word = encodeI(0x34, 0, clampReg(m[1]), imm16Signed(parseNumberLiteral(m[2])));
+          instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return;
+        }
+        // nop => add r0, r0, r0
+        if (/^nop\s*$/.exec(t)) {
+          word = encodeR(0x31, 0, 0, 0);
+          instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return;
+        }
+        // not rD, rS => nor rD, rS, r0
+        m = /^not\s+r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) {
+          word = encodeR(0x06, clampReg(m[2]), 0, clampReg(m[1]));
+          instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return;
+        }
+        // neg rD, rS => sub rD, r0, rS
+        m = /^neg\s+r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) {
+          word = encodeR(0x39, 0, clampReg(m[2]), clampReg(m[1]));
+          instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return;
+        }
+        // subi rD, rS, imm => addi rD, rS, -imm
+        m = /^subi\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) {
+          word = encodeI(0x04, clampReg(m[2]), clampReg(m[1]), imm16Signed(-parseNumberLiteral(m[3])));
+          instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return;
+        }
+
+        // I-type: addi, andi, ori, xori  rB, rA, imm (imm can be dec/0x../0b..)
+        m = /^addi\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x04, clampReg(m[2]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^andi\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x0C, clampReg(m[2]), clampReg(m[1]), imm16Unsigned(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^ori\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x14, clampReg(m[2]), clampReg(m[1]), imm16Unsigned(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^xori\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x1C, clampReg(m[2]), clampReg(m[1]), imm16Unsigned(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        // ldw rB, imm(rA)
+        m = /^ldw\s+r(\d+)\s*,?\s*([^\s\)]+)\s*\(\s*r(\d+)\s*\)\s*$/.exec(t);
+        if (m) { word = encodeI(0x17, clampReg(m[3]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[2]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        // stw rB, imm(rA)
+        m = /^stw\s+r(\d+)\s*,?\s*([^\s\)]+)\s*\(\s*r(\d+)\s*\)\s*$/.exec(t);
+        if (m) { word = encodeI(0x15, clampReg(m[3]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[2]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        // beq/bne rA, rB, offset
+        m = /^beq\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x26, clampReg(m[1]), clampReg(m[2]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^bne\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x1E, clampReg(m[1]), clampReg(m[2]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        // J-type
+        m = /^call\s+([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeJ(0x00, imm26Unsigned(parseNumberLiteral(m[1]))); instrTypeSelect.value = "J"; applyLayout("J"); writeWord(word); decodeFromBits(); return; }
+        m = /^jmpi\s+([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeJ(0x01, imm26Unsigned(parseNumberLiteral(m[1]))); instrTypeSelect.value = "J"; applyLayout("J"); writeWord(word); decodeFromBits(); return; }
+        // R-type
+        m = /^add\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x31, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^sub\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x39, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^and\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x0E, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^or\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x16, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^xor\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x1E, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^jmp\s+r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x0D, clampReg(m[1]), 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^callr\s+r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x1D, clampReg(m[1]), 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        if (/^ret\s*$/.exec(t)) { word = encodeR(0x05, 0, 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        // New I-type (imm/offset can be dec/0x../0b..)
+        m = /^andhi\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x2C, clampReg(m[2]), clampReg(m[1]), imm16Unsigned(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^bge\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x0E, clampReg(m[1]), clampReg(m[2]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^bgeu\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x2E, clampReg(m[1]), clampReg(m[2]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^blt\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x16, clampReg(m[1]), clampReg(m[2]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^bltu\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x36, clampReg(m[1]), clampReg(m[2]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^br\s+([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x06, 0, 0, imm16Signed(parseNumberLiteral(m[1]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpeqi\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x20, clampReg(m[2]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpgei\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x08, clampReg(m[2]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpgeui\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x28, clampReg(m[2]), clampReg(m[1]), imm16Unsigned(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmplti\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x10, clampReg(m[2]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpltui\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x30, clampReg(m[2]), clampReg(m[1]), imm16Unsigned(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpnei\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x18, clampReg(m[2]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^flushd\s+([^\s\)]+)\s*\(\s*r(\d+)\s*\)\s*$/.exec(t);
+        if (m) { word = encodeI(0x3B, clampReg(m[2]), 0, imm16Signed(parseNumberLiteral(m[1]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^flushda\s+([^\s\)]+)\s*\(\s*r(\d+)\s*\)\s*$/.exec(t);
+        if (m) { word = encodeI(0x1B, clampReg(m[2]), 0, imm16Signed(parseNumberLiteral(m[1]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^initd\s+([^\s\)]+)\s*\(\s*r(\d+)\s*\)\s*$/.exec(t);
+        if (m) { word = encodeI(0x33, clampReg(m[2]), 0, imm16Signed(parseNumberLiteral(m[1]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^initda\s+([^\s\)]+)\s*\(\s*r(\d+)\s*\)\s*$/.exec(t);
+        if (m) { word = encodeI(0x13, clampReg(m[2]), 0, imm16Signed(parseNumberLiteral(m[1]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^muli\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x24, clampReg(m[2]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^orhi\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x34, clampReg(m[2]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^rdprs\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x38, clampReg(m[2]), clampReg(m[1]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        m = /^xorhi\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*([^\s]+)\s*$/.exec(t);
+        if (m) { word = encodeI(0x3C, clampReg(m[2]), clampReg(m[1]), imm16Unsigned(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        // Loads/stores (same pattern: rB, imm(rA) or for store rB, imm(rA))
+        const ldstPattern = /^(\w+)\s+r(\d+)\s*,?\s*([^\s\)]+)\s*\(\s*r(\d+)\s*\)\s*$/;
+        const ldstOps = { ldb:0x07, ldbio:0x27, ldbu:0x03, ldbuio:0x23, ldh:0x0F, ldhio:0x2F, ldhu:0x0B, ldhuio:0x2B, ldwio:0x37, stb:0x05, stbio:0x25, sth:0x0D, sthio:0x2D, stwio:0x35 };
+        m = ldstPattern.exec(t);
+        if (m && ldstOps[m[1]]) { word = encodeI(ldstOps[m[1]], clampReg(m[4]), clampReg(m[2]), imm16Signed(parseNumberLiteral(m[3]))); instrTypeSelect.value = "I"; applyLayout("I"); writeWord(word); decodeFromBits(); return; }
+        // R-type new
+        m = /^nor\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x06, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpeq\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x20, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpge\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x08, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpgeu\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x28, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmplt\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x10, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpltu\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x30, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^cmpne\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x18, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^div\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x25, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^divu\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x24, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^mul\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x27, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^mulxss\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x1F, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^mulxsu\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x17, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^mulxuu\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x07, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^rol\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x03, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^ror\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x0B, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^sll\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x13, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^srl\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x1B, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^sra\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x3B, clampReg(m[2]), clampReg(m[3]), clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        // R with imm5 in OPX
+        m = /^break\s*(\S*)\s*$/.exec(t);
+        if (m) { word = encodeR((0x34 << 5) | imm5Unsigned(m[1] ? parseNumberLiteral(m[1]) : 0), 0, 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^trap\s*(\S*)\s*$/.exec(t);
+        if (m) { word = encodeR((0x2D << 5) | imm5Unsigned(m[1] ? parseNumberLiteral(m[1]) : 0), 0, 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^roli\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*(\S+)\s*$/.exec(t);
+        if (m) { word = encodeR((0x02 << 5) | imm5Unsigned(parseNumberLiteral(m[3])), clampReg(m[2]), 0, clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^slli\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*(\S+)\s*$/.exec(t);
+        if (m) { word = encodeR((0x12 << 5) | imm5Unsigned(parseNumberLiteral(m[3])), clampReg(m[2]), 0, clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^srli\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*(\S+)\s*$/.exec(t);
+        if (m) { word = encodeR((0x1A << 5) | imm5Unsigned(parseNumberLiteral(m[3])), clampReg(m[2]), 0, clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^srai\s+r(\d+)\s*,?\s*r(\d+)\s*,?\s*(\S+)\s*$/.exec(t);
+        if (m) { word = encodeR((0x3A << 5) | imm5Unsigned(parseNumberLiteral(m[3])), clampReg(m[2]), 0, clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^rdctl\s+r(\d+)\s*,?\s*(\S+)\s*$/.exec(t);
+        if (m) { word = encodeR((0x26 << 5) | imm5Unsigned(parseNumberLiteral(m[2])), 0, 0, clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^wrctl\s+(\S+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR((0x2E << 5) | imm5Unsigned(parseNumberLiteral(m[1])), clampReg(m[2]), 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        // R no-operand / single-reg
+        if (/^bret\s*$/.exec(t)) { word = encodeR(0x09, 0, 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        if (/^eret\s*$/.exec(t)) { word = encodeR(0x01, 0, 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        if (/^flushp\s*$/.exec(t)) { word = encodeR(0x04, 0, 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        if (/^sync\s*$/.exec(t)) { word = encodeR(0x36, 0, 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^flushi\s+r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x0C, clampReg(m[1]), 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^initi\s+r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x29, clampReg(m[1]), 0, 0); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^nextpc\s+r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x1C, 0, 0, clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+        m = /^wrprs\s+r(\d+)\s*,?\s*r(\d+)\s*$/.exec(t);
+        if (m) { word = encodeR(0x14, clampReg(m[2]), 0, clampReg(m[1])); instrTypeSelect.value = "R"; applyLayout("R"); writeWord(word); decodeFromBits(); return; }
+
+        asmError.textContent = "Unrecognised instruction. See reference for supported mnemonics.";
+      } catch (err) {
+        asmError.textContent = err.message || String(err);
+      }
+    }
+
+    // Initialize
+    createBitGrid();
+    applyLayout(instrTypeSelect.value);
+    hexInput.value = bitsToHexString();
+    updateDecodedTable();
+
+    instrTypeSelect.addEventListener("change", () => {
+      applyLayout(instrTypeSelect.value);
+      updateDecodedTable();
+    });
+
+    // Keep hex in sync when bits change
+    bitInputs.forEach((input) => {
+      input.addEventListener("input", () => {
+        hexInput.value = bitsToHexString();
+        updateDecodedTable();
+      });
+    });
+
+    // Allow user to type hex and update bits
+    hexInput.addEventListener("input", () => {
+      hexStringToBits(hexInput.value);
+      hexInput.value = bitsToHexString();
+      updateDecodedTable();
+    });
+
+    decodeFromBitsBtn.addEventListener("click", decodeFromBits);
+    asmAssembleBtn.addEventListener("click", handleAssembleClick);
+    instrRefBtn.addEventListener("click", () => {
+      instrRefModal.classList.add("open");
+      instrRefModal.setAttribute("aria-hidden", "false");
+    });
+    function closeInstrRefModal() {
+      instrRefModal.classList.remove("open");
+      instrRefModal.setAttribute("aria-hidden", "true");
+    }
+    instrRefClose.addEventListener("click", closeInstrRefModal);
+    instrRefModal.addEventListener("click", closeInstrRefModal);
+  </script>
+</body>
+</html>
